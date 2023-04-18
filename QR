@@ -88,3 +88,96 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+"Нахождение цвета"
+"""from cv_bridge import CvBridge # Чтобы брать изображение
+from sensor_msgs.msg import Image # Для топика камеры
+import cv2 # OpenCV
+
+bridge = CvBridge()
+
+color = 'error' # Инициализируем наш текст
+def color_callback(data):
+    global color # Делаем ее глобальной, чтобы потом можно было вызвать из любого места
+    cv_image = bridge.imgmsg_to_cv2(data, 'bgr8') # Берем изображение из топика камеры
+    img_hsv = cv2.cvtColor(cv_image, cv2.COLOR_BGR2HSV)[119:120, 159:160]
+    # Самое последнее, где 119... это пиксель центра камеры
+    
+    # От симулятора и в жизни могут отличаться значения
+    red_low_value = (0, 150, 200) # Минимальное примерное
+    red_high_value = (10, 255, 255) # Максимальное примерное
+    
+    # Вы можете просто брать среднее арифметическое самого цвета, где 1 параметр вы можете
+    # добавить и убавить в 1 параметры по 10 едениц, а 2 и 3 от 30 до 50, в самом где (..., ..., )
+    
+    # В каких областях будет детектиться цвет
+    red_final = cv2.inRange(img_hsv, red_low_value, red_high_value)
+    
+    # Если он находится в таких значениях, то выводит, что это красный цвет
+    if red_final[0][0] == 255:
+        color = 'red'
+    else:
+        color = 'error'
+
+# Нужно добавить ноду image_raw_throttled, иначе используйте image_raw
+image_sub = rospy.Subscriber("main_camera/image_raw_throttled", Image, color_callback)"""
+
+
+
+"Нахождение нескольких цветов"
+"""import random # Для сохранения скриншота с отрисовкой контура
+import cv2 # OpenCV
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge # Для взятия  скриншота
+
+bridge = CvBridge()
+
+dict_flag, i, detect_flag = [], -1, True
+def flag_detect():
+    global dict_flag, i, detect_flag
+    imgg = bridge.imgmsg_to_cv2(rospy.wait_for_message('main_camera/image_raw_throttled', Image), 'bgr8')
+    # Берем скриншот из топика камеры, если же у вас нет ноды тротла, то уберите его
+
+    dict_flag.append([[0,0,0], [0,0,0]]) # Для того, чтобы значение отдельного цвета считать в массив
+    
+    if detect_flag:
+        detect_flag = False
+        i += 1 # Увеличиваем значение нашего массиваа
+
+    img = cv2.cvtColor(imgg, cv2.COLOR_BGR2HSV)
+    
+    # Распознавание красного
+    frame = cv2.inRange(img, (0, 89, 150), (15, 255, 255)) # Мин/Макс значения по красному
+    cnt = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+    # Для нахождения конутров самого цвета
+    try: 
+        for c in cnt:
+            moments = cv2.moments(c, 1) # Считаем каждый пиксель с фотки       
+            sum_pixel = moments['m00'] # Сумма пикселей
+            if sum_pixel > 10: # Если пикселей с красным больше 10, то будет считать, проверка
+                dict_flag[i][0] = [sum_pixel, int(moments['m10'] / sum_pixel), int(moments['m01'] / sum_pixel)]
+                # Считаем значение самого HSV; m10 - по оси x, где m01 - по оси y
+                detect_flag = True
+                cv2.drawContours(imgg, [c], 0, (255,255,255), 3) # Рисуем контуры, для откладки на фото
+    except:
+        pass
+
+    # Распознавание желтого цвета 
+    frame = cv2.inRange(img, (25, 150, 200), (35, 255, 255)) # Мин/Макс значения по желтому
+    cnt = cv2.findContours(frame, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+    try: 
+        for c in cnt:
+            moments = cv2.moments(c, 1)       
+            sum_pixel = moments['m00']
+            if sum_pixel > 10:
+                dict_flag[i][1] = [sum_pixel, int(moments['m10'] / sum_pixel), int(moments['m01'] / sum_pixel)]
+                detect_flag = True
+                cv2.drawContours(imgg, [c], 0, (0,0,0), 3)
+    except:
+        pass
+    
+    print(dict_flag) # Вывод итогового HSV значения каждого цвета
+    
+    cv2.imwrite("/home/clover/image{0}.png".format(random.randint(0,1000)), imgg)
+    # Для сохранения фотки где будет храниться контур отрисованный"""
