@@ -1,5 +1,5 @@
-"Распознование QR"
-"catkin_ws/src/clover/clover_simulation/models/aruco_cmit_txt/materials/textures - путь к аруко меткам"
+# "Распознование QR"
+# "catkin_ws/src/clover/clover_simulation/models/aruco_cmit_txt/materials/textures - путь к аруко меткам"
 
 import rospy
 from clover import srv
@@ -125,7 +125,7 @@ image_sub = rospy.Subscriber("main_camera/image_raw_throttled", Image, color_cal
 
 
 
-"Нахождение нескольких цветов"
+# "Нахождение нескольких цветов"
 """import random # Для сохранения скриншота с отрисовкой контура
 import cv2 # OpenCV
 from sensor_msgs.msg import Image
