@@ -1,5 +1,6 @@
 # "Распознование QR"
 # "catkin_ws/src/clover/clover_simulation/models/aruco_cmit_txt/materials/textures - путь к аруко меткам"
+# https://github.com/sfalexrog/coex_kb/blob/master/kb014_opencv_python.md
 
 import rospy
 from clover import srv
