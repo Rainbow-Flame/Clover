@@ -8,6 +8,12 @@
 # Для включения распознавания карт маркеров аргументы aruco_map и aruco_detect в файле
 # ~/catkin_ws/src/clover/clover/launch/aruco.launch должны быть в значении true
 
+# чтобы открыть в браузере камеру написать localhost или 192.168.11.1
+
+# https://github.com/Odissenmark
+# https://github.com/sfalexrog/coex_kb/blob/master/kb014_opencv_python.md
+# https://www.the-qrcode-generator.com/?lng=ru
+
 import math
 import cv2
 import rospy
