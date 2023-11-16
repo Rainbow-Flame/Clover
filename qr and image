@@ -1,0 +1,136 @@
+import math
+import cv2
+import numpy as np
+import pandas as pd
+import rospy
+import colorsys
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image
+from clover import srv
+from std_srvs.srv import Trigger
+from clover.srv import SetLEDEffect
+
+bridge = CvBridge()
+rospy.init_node('flight')
+
+color_debug = rospy.Publisher("/color_debug", Image ,queue_size=10)
+
+np.random.BitGenerator
+
+get_telemetry = rospy.ServiceProxy('get_telemetry', srv.GetTelemetry)
+navigate = rospy.ServiceProxy('navigate', srv.Navigate)
+navigate_global = rospy.ServiceProxy('navigate_global', srv.NavigateGlobal)
+set_position = rospy.ServiceProxy('set_position', srv.SetPosition)
+set_velocity = rospy.ServiceProxy('set_velocity', srv.SetVelocity)
+set_attitude = rospy.ServiceProxy('set_attitude', srv.SetAttitude)
+set_rates = rospy.ServiceProxy('set_rates', srv.SetRates)
+land = rospy.ServiceProxy('land', Trigger)
+set_effect = rospy.ServiceProxy('led/set_effect', SetLEDEffect)
+
+
+index=["color", "color_name", "hex", "R", "G", "B"]
+csv = pd.read_csv('colors.csv', names=index, header=None)
+font = cv2.FONT_HERSHEY_SIMPLEX 
+print(csv)
+
+color = 'undefind'
+def image_callback(data):
+    global color, r, g, b
+    cv_image = bridge.imgmsg_to_cv2(data, 'bgr8') # OpenCv image
+    img_rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)[119:120, 159:160]
+    r = img_rgb[0][0][0]
+    g = img_rgb[0][0][1]
+    b = img_rgb[0][0][2]
+
+
+#Contour обнаружение
+def getContours(img):
+    global objectType
+    objectType = "None"
+    # "Cv_retr_external", значение метода "cv_chain_approx_none", то есть только обнаруживает внешний внешний контур и сохраняет все точки в контурной точке
+    contours,hierarchy = cv2.findContours(img,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+    for cnt in contours:
+        #Calculed Area
+        area = cv2.contourArea(cnt)
+        if area>500:
+            cv2.drawContours(imgContour, cnt, -1, (255, 0, 0), 3)
+            peri = cv2.arcLength(cnt,True)
+
+            approx = cv2.approxPolyDP(cnt,0.02*peri,True)
+            objCor = len(approx)
+            #, X, y - координата верхней левой точки матрицы, w, h - ширина и высота матрицы
+            x, y, w, h = cv2.boundingRect(approx)
+
+            if objCor ==3:
+                objectType = "Triangle"
+
+            elif objCor == 4:
+                aspRatio = w/float(h)
+                if aspRatio > 0.98 and aspRatio < 1.03:
+                    objectType = "Square"
+                else:
+                    objectType="Rectangle"
+
+            elif objCor > 4: 
+                objectType = "Circles"
+                
+
+            cv2.rectangle(imgContour,(x,y),(x+w,y+h),(0,255,0),2)
+            cv2.putText(imgContour, objectType, (x+(w//2)-10,y+(h//2)-10), font, 0.5, (225,255,0), 2)
+
+
+def capture_callback(data):
+    global imgContour
+    img = bridge.imgmsg_to_cv2(data, 'bgr8')
+    imgContour = img.copy()
+
+    imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+    imgBlur = cv2.GaussianBlur(imgGray,(7,7),1)
+    imgCanny = cv2.Canny(imgBlur,50,50)
+    getContours(imgCanny)
+
+    imgBlank = np.zeros_like(img)
+
+    color_debug.publish(bridge.cv2_to_imgmsg(imgContour, 'bgr8')) # image topic
+
+
+
+def navigate_wait(x=0, y=0, z=1, yaw=0, speed=1, frame_id='aruco_map', auto_arm=False, tolerance=0.2):
+    navigate(x=x, y=y, z=z, yaw=yaw, speed=speed, frame_id=frame_id, auto_arm=auto_arm)
+
+    while not rospy.is_shutdown():
+        telem = get_telemetry(frame_id='navigate_target')
+        telem_auto = get_telemetry()
+
+        if math.sqrt(telem.x ** 2 + telem.y ** 2 + telem.z ** 2) < tolerance:
+            rospy.sleep(1)
+            print("REACHED | X = {} | Y = {}".format(telem_auto.x, telem_auto.y)) # get coordinate
+            print(recognize_color(r, g, b))
+            set_effect(r=r, g=g, b=b) # colors rgb
+            rospy.sleep(1)
+            break
+        
+        rospy.sleep(0.2)
+
+
+def recognize_color(R,G,B):
+    minimum = 10000
+    for i in range(len(csv)):
+        d = abs(R- int(csv.loc[i,"R"])) + abs(G- int(csv.loc[i,"G"])) + abs(B- int(csv.loc[i,"B"]))
+        if(d<=minimum):
+            minimum = d
+            cname = csv.loc[i, "color_name"]
+
+    return cname, R, G, B
+
+image_sub = rospy.Subscriber("main_camera/image_raw_throttled",
+ Image, image_callback, queue_size=1)
+cap_sub = rospy.Subscriber("main_camera/image_raw_throttled",
+ Image, capture_callback, queue_size=2)
+
+navigate_wait(0, 0, frame_id='body', auto_arm=True)
+navigate_wait(1, 0)
+navigate_wait(2, 0)
+navigate_wait(3, 0)
+navigate_wait()
+land()
